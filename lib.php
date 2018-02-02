@@ -51,29 +51,33 @@
 	}
 	
 	function getCourse($client) {
-		$hlc_btc_price = 0.00002;
-		$kzt_rub_price = 5.8;
-		$client->postMessage("Загружаю курс. Подождите...");
-		$response = file_get_contents("https://yobit.net/api/2/btc_rur/ticker");
-		if(!isJSON($response)) {
-			$client->postMessage("API временно недоступно. Повторите запрос позже");
+		$response = apiQuery("getRates", array());
+		$result = json_decode($response, true);
+		if($result['success'] != true) {
+			$client->postMessage("Нет соединения, повторите запрос позже");
 		} else {
-			$arr = json_decode($response, true);
-			$rub_price = number_format($hlc_btc_price*$arr['ticker']['sell'], 2);
-			$kzt_price = number_format($rub_price * $kzt_rub_price, 2);
-			
-			$response = file_get_contents("https://yobit.net/api/2/btc_usd/ticker");
-			if(isJSON($response)) {
-				$arr = json_decode($response, true);
-				$usd_price = number_format($hlc_btc_price*$arr["ticker"]["sell"], 2);
-				$usd_line = "1 HLC = ".$usd_price." USD\n";
-			} else {
-				$usd_line = '';
+			$message = "Текущий курс HLC:\n\n";
+			for($i = 0; $i < count($result['data']); $i++) {
+				$code = $result['data'][$i]['provider_code'];
+				switch($code) {
+					default:
+						$numbers = 8;
+						break;
+					case 'USD':
+						$numbers = 4;
+						break;
+					case 'RUB':
+						$numbers = 2;
+						break;
+					case 'KZT':
+						$numbers = 2;
+						break;
+				}
+				$exchange = number_format($result['data'][$i]['provider_exchange'], $numbers);
+				$message .= "1 HLC = ".$exchange." ".$code."\n";
 			}
-			
-			$message = "Текущий курс HLC:\n\n1 HLC = ".number_format($hlc_btc_price, 8)." BTC\n".$usd_line."1 HLC = ".$rub_price." RUB\n1 HLC = ".$kzt_price." KZT";
+			$client->postMessage($message);
 		}
-		$client->postMessage($message);
 	}
 	
 	function apiQuery($method, $query) {
